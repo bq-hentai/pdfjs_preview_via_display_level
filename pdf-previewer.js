@@ -181,6 +181,7 @@
     this.src = this.opts.pdfPath;
     this.scale = this.opts.initialScale;
 
+    this.loadingTask = null;
     this.pdf$ = { };
     if (this.opts.boundResize) {
       this.handleResize = (function(evt) {
@@ -208,7 +209,8 @@
   }
 
   proto.init = function() {
-    return loadPdfDocument(this.src)
+    this.loadingTask = loadPdfDocument(this.src);
+    return this.loadingTask
       .then(handlePdfDocument)
       .then(this.onLoadAll.bind(this))
       .catch(this.opts.onError.bind(this));
@@ -360,14 +362,19 @@
   }
 
   proto.changeSrc = function(src) {
+    if (this.loadingTask) {
+      try {
+        this.loadingTask.destroy();
+      } catch (e) { /* Ignore */ }
+    }
+
     this.src = src;
 
-    return loadPdfDocument(this.src)
+    this.loadingTask = loadPdfDocument(this.src)
+    return this.loadingTask
       .then(handlePdfDocument)
       .then(function(pdf$) {
-        if (this.$el) {
-          this.opts.$container.removeChild(this.$el);
-        }
+        this.clearCanvas();
         this.onLoadAll(pdf$);
       }.bind(this))
       .catch(this.opts.onError.bind(this));
@@ -417,16 +424,37 @@
     return this;
   }
 
+  proto.clearCanvas = function () {
+    if (this.$el) {
+      ;[].slice.call(this.$el.querySelectorAll('.page-list-item canvas')).forEach(function (x) {
+        x.width = 0;
+        x.height = 0;
+      });
+
+      this.$el.remove();
+    }
+  }
+
   proto.destroy = function() {
     this.unbindEvents();
-    this.$el && this.$el.remove();
-    return Promise.resolve()
-      .then(function() {
-        return this.pdf$.info.destroy();
-      })
-      .finally(function() {
-        this.pdf$ = null;
-      });
+    this.clearCanvas();
+
+    if (this.loadingTask) {
+      try {
+        this.loadingTask.destroy();
+      }
+      catch (e) { /* Ignore */ }
+      finally {
+        this.loadingTask = null
+      }
+    }
+    try {
+      this.pdf$.info.destroy();
+    }
+    catch (e) { /* Ignore */ }
+    finally {
+      this.pdf$ = null;
+    }
   }
 
   return PDFPreviewer;

@@ -17,6 +17,12 @@
     previewer.changeSrc('compressed.tracemonkey-pldi-09.pdf').then(function() {
       previewer.toPage(14);
     });
-  }, 5000);
+  }, 4000);
+
+  setTimeout(function () {
+    previewer.destroy();
+
+    previewer = null;
+  }, 7000);
 
 })(this);
